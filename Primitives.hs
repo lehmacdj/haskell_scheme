@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE ExistentialQuantification #-}
 
 module Primitives where
 
@@ -54,15 +55,15 @@ cons [x1, x2] = return $ DottedList [x1] x2
 cons badArgs = throwError $ NumArgs 2 badArgs
 
 eqv :: [LispVal] -> ThrowsError LispVal
-eqv [(Bool x), (Bool y)]     = pure $ Bool $ a == b
-eqv [(Number x), (Number y)] = pure $ Bool $ a == b
-eqv [(String x), (String y)] = pure $ Bool $ a == b
-eqv [(Atom x), (Atom y)]     = pure $ Bool $ a == b
+eqv [(Bool x), (Bool y)]     = pure $ Bool $ x == y
+eqv [(Number x), (Number y)] = pure $ Bool $ x == y
+eqv [(String x), (String y)] = pure $ Bool $ x == y
+eqv [(Atom x), (Atom y)]     = pure $ Bool $ x == y
 eqv [(DottedList xs x), (DottedList ys y)] =
     eqv [List $ xs ++ [x], List $ ys ++ [y]]
 eqv [(List x), (List y)] =
-    pure $ Bool $ (length x == length y) && all $ zipWith eqvBool x y
-        where eqvBool x y = case eqv x y of
+    pure $ Bool $ (length x == length y) && (and $ zipWith eqvBool x y)
+        where eqvBool x y = case eqv [x, y] of
                               Left err -> False
                               Right (Bool val) -> val
 eqv [_, _] = pure $ Bool False
@@ -81,19 +82,17 @@ equal :: [LispVal] -> ThrowsError LispVal
 equal [DottedList xs x, DottedList ys y] =
     equal [List $ xs ++ [x], List $ ys ++ [y]]
 equal [List x, List y] =
-    pure $ Bool $ (length x == length y) && all $ zipWith equalBool x y
-        where equalBool x y = case equal x y of
+    pure $ Bool $ (length x == length y) && (and $ zipWith equalBool x y)
+        where equalBool x y = case equal [x, y] of
                                 Left err -> False
                                 Right (Bool val) -> val
 equal [x, y] = do
     primEq <- or <$> mapM (unpackEquals x y) unpackers
     (Bool eqvEq) <- eqv [x, y]
     pure $ Bool $ primEq || eqvEq
-        where unpackers =
-            [ AnyUnpacker unpackNum
-            , AnyUnpacker unpackString
-            , AnyUnpacker unpackBool
-            ]
+        where unpackers = [ AnyUnpacker unpackNum
+                          , AnyUnpacker unpackString
+                          , AnyUnpacker unpackBool ]
 equal badArgs = throwError $ NumArgs 2 badArgs
 
 binop :: (LispVal -> ThrowsError a) -> (b -> LispVal) ->
