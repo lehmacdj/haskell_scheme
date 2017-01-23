@@ -22,14 +22,36 @@ unpackNum (List [n]) = unpackNum n
 unpackNum notNum     = throwError $ TypeMismatch "number" notNum
 
 unpackBool :: LispVal -> ThrowsError Bool
-unpackBool (Bool b) = return b
+unpackBool (Bool b) = pure b
 unpackBool notBool  = throwError $ TypeMismatch "boolean" notBool
 
 unpackString :: LispVal -> ThrowsError String
-unpackString (String s) = return s
-unpackString (Number s) = return $ show s
-unpackString (Bool s)   = return $ show s
+unpackString (String s) = pure s
+unpackString (Number s) = pure $ show s
+unpackString (Bool s)   = pure $ show s
 unpackString notString  = throwError $ TypeMismatch "string" notString
+
+-- head
+car :: [LispVal] -> ThrowsError LispVal
+car [List (x : _)]         = pure x
+car [DottedList (x : _) _] = pure x
+car [badArg]               = throwError $ TypeMismatch "pair" badArg
+car badArgs                = throwError $ NumArgs 1 badArgs
+
+-- tail
+cdr :: [LispVal] -> ThrowsError LispVal
+cdr [List (_ : xs)]         = pure $ List xs
+cdr [DottedList [_] x]      = pure x
+cdr [DottedList (_ : xs) x] = pure $ DottedList xs x
+cdr [badArg]                = throwError $ TypeMismatch "pair" badArg
+cdr badArgs                 = throwError $ NumArgs 1 badArgs
+
+cons :: [LispVal] -> ThrowsError LispVal
+cons [x, List []] = pure $ List [x]
+cons [x, List xs] = pure $ List $ x : xs
+cons [x, DottedList xs xf] = pure $ DottedList (x : xs) xf
+cons [x1, x2] = return $ DottedList [x1] x2
+cons badArgs = throwError $ NumArgs 2 badArgs
 
 binop :: (LispVal -> ThrowsError a) -> (b -> LispVal) ->
     (a -> a -> b) -> [LispVal] -> ThrowsError LispVal
@@ -69,4 +91,7 @@ primitives = M.fromList
     , ("string>?", binopSB (>))
     , ("string<=?", binopSB (<=))
     , ("string>=?", binopSB (>=))
+    , ("car", car)
+    , ("cdr", cdr)
+    , ("cons", cons)
     ]
