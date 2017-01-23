@@ -53,6 +53,49 @@ cons [x, DottedList xs xf] = pure $ DottedList (x : xs) xf
 cons [x1, x2] = return $ DottedList [x1] x2
 cons badArgs = throwError $ NumArgs 2 badArgs
 
+eqv :: [LispVal] -> ThrowsError LispVal
+eqv [(Bool x), (Bool y)]     = pure $ Bool $ a == b
+eqv [(Number x), (Number y)] = pure $ Bool $ a == b
+eqv [(String x), (String y)] = pure $ Bool $ a == b
+eqv [(Atom x), (Atom y)]     = pure $ Bool $ a == b
+eqv [(DottedList xs x), (DottedList ys y)] =
+    eqv [List $ xs ++ [x], List $ ys ++ [y]]
+eqv [(List x), (List y)] =
+    pure $ Bool $ (length x == length y) && all $ zipWith eqvBool x y
+        where eqvBool x y = case eqv x y of
+                              Left err -> False
+                              Right (Bool val) -> val
+eqv [_, _] = pure $ Bool False
+eqv badArgs = throwError $ NumArgs 2 badArgs
+
+data Unpacker = forall a. Eq a => AnyUnpacker (LispVal -> ThrowsError a)
+
+unpackEquals :: LispVal -> LispVal -> Unpacker -> ThrowsError Bool
+unpackEquals x y (AnyUnpacker unpacker) =
+    do x' <- unpacker x
+       y' <- unpacker y
+       pure $ x' == y'
+    `catchError` (const $ pure False)
+
+equal :: [LispVal] -> ThrowsError LispVal
+equal [DottedList xs x, DottedList ys y] =
+    equal [List $ xs ++ [x], List $ ys ++ [y]]
+equal [List x, List y] =
+    pure $ Bool $ (length x == length y) && all $ zipWith equalBool x y
+        where equalBool x y = case equal x y of
+                                Left err -> False
+                                Right (Bool val) -> val
+equal [x, y] = do
+    primEq <- or <$> mapM (unpackEquals x y) unpackers
+    (Bool eqvEq) <- eqv [x, y]
+    pure $ Bool $ primEq || eqvEq
+        where unpackers =
+            [ AnyUnpacker unpackNum
+            , AnyUnpacker unpackString
+            , AnyUnpacker unpackBool
+            ]
+equal badArgs = throwError $ NumArgs 2 badArgs
+
 binop :: (LispVal -> ThrowsError a) -> (b -> LispVal) ->
     (a -> a -> b) -> [LispVal] -> ThrowsError LispVal
 binop from to op [from -> x, from -> y] = to <$> (op <$> x <*> y)
@@ -94,4 +137,7 @@ primitives = M.fromList
     , ("car", car)
     , ("cdr", cdr)
     , ("cons", cons)
+    , ("eq?", eqv)
+    , ("eqv?", eqv)
+    , ("equal?", equal)
     ]
