@@ -91,7 +91,15 @@ eval :: LispVal -> Eval LispVal
 eval val@(String _) = pure val
 eval val@(Number _) = pure val
 eval val@(Bool _) = pure val
+
 eval (List [Atom "quote", val]) = pure val
+
+eval (List [Atom "if", g, t, e]) = do
+    g' <- eval g
+    case g' of
+      Bool False -> eval e
+      otherwise  -> eval t
+
 eval (List (Atom func : args)) = do
     env <- ask
     let func' = M.lookup func env
@@ -100,6 +108,7 @@ eval (List (Atom func : args)) = do
         (throwError $ NotFunction "Unrecognized primitive function args" func)
         ($ args')
         func'
+
 eval badForm = throwError $ BadSpecialForm "Unrecognized special form" badForm
 
 evaluate :: LispVal -> ThrowsError LispVal
