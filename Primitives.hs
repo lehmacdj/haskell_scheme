@@ -111,7 +111,7 @@ multiopBB = multiop unpackBool Bool
 binopNB = binop unpackNum Bool
 binopSB = binop unpackString Bool
 
-primitives :: Context
+primitives :: M.Map String ([LispVal] -> ThrowsError LispVal)
 primitives = M.fromList
     [ ("+", multiopNN (+))
     , ("-", multiopNN (-))
