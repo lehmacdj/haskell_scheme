@@ -1,6 +1,9 @@
 module LispError
 ( LispError(..)
 , ThrowsError
+, IOThrowsError
+, runIOThrows
+, liftThrows
 , unwrap
 , trapError
 ) where
@@ -31,9 +34,17 @@ showError (Parser parseErr) = "Parse error at " ++ show parseErr
 instance Show LispError where show = showError
 
 type ThrowsError = Either LispError
+type IOThrowsError = ExceptT LispError IO
 
-trapError :: ThrowsError String -> ThrowsError String
+trapError :: (Show e, MonadError e m) => m String -> m String
 trapError action = action `catchError` (pure . show)
+
+liftThrows :: ThrowsError a -> IOThrowsError a
+liftThrows (Left err) = throwError err
+liftThrows (Right val) = pure val
+
+runIOThrows :: IOThrowsError String -> IO String
+runIOThrows action = runExceptT (trapError action) >>= pure . unwrap
 
 unwrap :: ThrowsError a -> a
 unwrap (Right val) = val

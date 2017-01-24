@@ -13,11 +13,11 @@ import System.Console.Haskeline (getInputLine, runInputT, defaultSettings)
 flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout
 
-evalString :: String -> IO String
-evalString expr = pure $ unwrap $ trapError (show <$> (readExpr expr >>= evaluate))
+evalString :: Env -> String -> IO String
+evalString env expr = runIOThrows $ liftM show $ (liftThrows $ readExpr expr) >>= evaluate env
 
-evalAndPrint :: String -> IO ()
-evalAndPrint expr = evalString expr >>= putStrLn
+evalAndPrint :: Env -> String -> IO ()
+evalAndPrint env expr = evalString env expr >>= putStrLn
 
 until_ :: Monad m => (a -> Bool) -> m (Maybe a) -> (a -> m ()) -> m ()
 until_ pred prompt action = do
@@ -26,11 +26,14 @@ until_ pred prompt action = do
       Nothing ->  pure ()
       Just result' -> action result' >> until_ pred prompt action
 
+runOnce :: String -> IO ()
+runOnce expr = nullEnv >>= flip evalAndPrint expr
+
 runRepl :: IO ()
-runRepl = until_
+runRepl = nullEnv >>= until_
     (=="quit")
     (runInputT defaultSettings $ getInputLine "Lisp>>> ")
-    evalAndPrint
+    . evalAndPrint
 
 usage :: String
 usage = "Usage: hscheme [expr]\n"
@@ -42,5 +45,5 @@ main = do
      args <- getArgs
      case length args of
        0 -> runRepl
-       1 -> evalAndPrint $ args !! 0
+       1 -> runOnce $ args !! 0
        otherwise -> putStrLn usage
