@@ -4,6 +4,8 @@ import Parser
 import LispError
 import Eval
 
+import Control.Monad
+
 import System.Environment
 import System.IO
 import System.Console.Haskeline (getInputLine, runInputT, defaultSettings)
@@ -18,11 +20,11 @@ evalAndPrint :: String -> IO ()
 evalAndPrint expr = evalString expr >>= putStrLn
 
 until_ :: Monad m => (a -> Bool) -> m (Maybe a) -> (a -> m ()) -> m ()
-until_ guard prompt action = do
-    (Just result) <- prompt
-    if guard result
-       then return ()
-       else action result >> until_ guard prompt action
+until_ pred prompt action = do
+    result <- prompt
+    case mfilter (not . pred) result of
+      Nothing ->  pure ()
+      Just result' -> action result' >> until_ pred prompt action
 
 runRepl :: IO ()
 runRepl = until_
