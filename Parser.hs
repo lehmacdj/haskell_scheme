@@ -2,13 +2,12 @@ module Parser
 ( readExpr
 ) where
 
-import LispVal
-import LispError
 
+import LispVal
 import Control.Monad
 import Control.Monad.Except
-
 import Text.ParserCombinators.Parsec hiding (spaces)
+
 
 symbol :: Parser Char
 symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
@@ -71,7 +70,7 @@ parseExpr =
     <|> parseQuoted
     <|> parseListVariant
 
-readExpr :: String -> ThrowsError LispVal
+readExpr :: String -> Throws LispVal
 readExpr string = case parse parseExpr "lisp" string of
                     Left err -> throwError $ Parser err
                     Right val -> pure val

@@ -1,39 +1,45 @@
 module Main where
 
+import LispVal
 import Parser
-import LispError
 import Eval
 
 import Control.Monad
+import Control.Monad.Except
+import Control.Monad.Reader (liftIO)
 
 import System.Environment
 import System.IO
-import System.Console.Haskeline (getInputLine, runInputT, defaultSettings)
+import System.Console.Haskeline
 
-flushStr :: String -> IO ()
-flushStr str = putStr str >> hFlush stdout
+-- convert an error into a string
+trapError :: (MonadError e m, Show e) => m String -> m String
+trapError = flip catchError (pure . show)
 
-evalString :: Env -> String -> IO String
-evalString env expr = runIOThrows $ liftM show $ (liftThrows $ readExpr expr) >>= evaluate env
+evalString :: String -> Eval LispVal
+evalString expr = liftThrows (readExpr expr) >>= eval
 
-evalAndPrint :: Env -> String -> IO ()
-evalAndPrint env expr = evalString env expr >>= putStrLn
+evalAndPrint :: String -> Eval ()
+evalAndPrint expr = trapError (show <$> evalString expr) >>= liftIO . putStrLn
 
 until_ :: Monad m => (a -> Bool) -> m (Maybe a) -> (a -> m ()) -> m ()
 until_ pred prompt action = do
     result <- prompt
     case mfilter (not . pred) result of
-      Nothing ->  pure ()
+      Nothing -> pure ()
       Just result' -> action result' >> until_ pred prompt action
 
 runOnce :: String -> IO ()
-runOnce expr = nullEnv >>= flip evalAndPrint expr
+runOnce expr = fmap unwrapThrows $ nullEnv >>= runEvalWithEnv (evalAndPrint expr)
 
 runRepl :: IO ()
-runRepl = nullEnv >>= until_
-    (=="quit")
-    (runInputT defaultSettings $ getInputLine "Lisp>>> ")
-    . evalAndPrint
+runRepl = fmap unwrapThrows $ nullEnv >>=
+    (runEvalWithEnv $
+    runInputT defaultSettings $
+    until_
+        (==":q")
+        (getInputLine "Lisp>>> ")
+        (lift . evalAndPrint))
 
 usage :: String
 usage = "Usage: hscheme [expr]\n"
