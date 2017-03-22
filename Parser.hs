@@ -4,7 +4,6 @@ module Parser
 
 
 import LispVal
-import Control.Monad
 import Control.Monad.Except
 import Text.ParserCombinators.Parsec hiding (spaces)
 
@@ -17,9 +16,9 @@ spaces = skipMany1 space
 
 parseString :: Parser LispVal
 parseString = do
-    char '"'
+    _ <- char '"'
     x <- many (noneOf "\"")
-    char '"'
+    _ <- char '"'
     pure $ String x
 
 parseAtom :: Parser LispVal
@@ -37,18 +36,18 @@ parseNumber = Number . read <$> many1 digit
 
 parseProtoList :: Parser [LispVal]
 parseProtoList = do
-    char '('
+    _ <- char '('
     parseExpr `sepEndBy` spaces
 
 parseListEnd :: Parser ([LispVal] -> LispVal)
 parseListEnd = do
-    char ')'
+    _ <- char ')'
     pure $ \proto -> List proto
 
 parseDottedListEnd :: Parser ([LispVal] -> LispVal)
 parseDottedListEnd = do
-    last <- char '.' >> spaces >> parseExpr
-    pure $ \proto -> DottedList proto last
+    tl <- char '.' >> spaces >> parseExpr
+    pure $ \proto -> DottedList proto tl
 
 parseListVariant :: Parser LispVal
 parseListVariant = do
@@ -58,7 +57,7 @@ parseListVariant = do
 
 parseQuoted :: Parser LispVal
 parseQuoted = do
-    char '\''
+    _ <- char '\''
     x <- parseExpr
     pure $ List [Atom "quote", x]
 
@@ -71,6 +70,6 @@ parseExpr =
     <|> parseListVariant
 
 readExpr :: String -> Throws LispVal
-readExpr string = case parse parseExpr "lisp" string of
-                    Left err -> throwError $ Parser err
-                    Right val -> pure val
+readExpr str = case parse parseExpr "lisp" str of
+                 Left err -> throwError $ Parser err
+                 Right val -> pure val
